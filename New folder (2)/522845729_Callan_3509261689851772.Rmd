@@ -1,0 +1,596 @@
+---
+title: "Callan Help"
+author: "Sierra Gillman"
+date: "2023-03-02"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Step 1: Loading QIIME@ artifact into R for visualization and analysis
+
+**Libraries**
+```{r warning=FALSE, message=FALSE}
+
+ if (!requireNamespace("devtools", quietly = TRUE)){install.packages("devtools")}
+ devtools::install_github("jbisanz/qiime2R")
+library(qiime2R) # import data
+ 
+library(microbiome) # data analysis
+library(tidyverse) # data wrangling
+library(phyloseq) # also the basis of data object. Data analysis and visualisation
+library(picante) # faith's PD
+library(vegan) # some analyses/utilties
+library(Rmisc) # summary stats
+library(ape)
+
+# visualizations/data wrangling
+
+library(extrafont)
+library(ggplot2) # visualization
+library(cowplot) # visualization
+library(ggpubr) # visualization
+library(dplyr) # data handling
+
+
+
+```
+
+
+
+
+**Data Import: Create Phyloseq Object**
+>**_Note:_** I think its always good coding practice to make a new R project for each different analyses/chapters with all the files in a dedicated folder: doing this will make sure your directory is always in the correct location and will keep the different scripts separated for each section. I think it keeps things clean and organized.
+
+```{r}
+# otu_table.qzq <- read_qza("/path/to/file/")
+# Meta data <- read.tsv("/path/to/file/")
+# taxonomy<-read_qza("/path/to/file/")
+# taxtable<-taxonomy$data %>% as_tibble() %>% separate(Taxon, sep=";", c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species")) #convert the table into a tabular split version
+# tree<-read_qza("/path/to/file/")
+
+## my Example data
+## I am not in the same directory so I'm calling these out directly from the folders they are located in
+
+# OTUs/ASVs
+SVs<-read_qza("/Users/cherst/Desktop/Thesis Data/clean-table-unassigned_Unknown_Arch-rm.qza")
+
+##START EDIT
+
+# Meta
+#metadata<-read_csv("/Users/cherst/Desktop/Thesis #Data/MuscleMetadata.tsv",show_col_types = FALSE)
+metadata<-read.table("/Users/cherst/Desktop/Thesis Data/CMuscleMetadata.tsv", sep="\t", header=T)
+
+metadata$SampleType<-factor(metadata$SampleType)
+metadata$Location<-factor(metadata$Location)
+metadata$Temp<-factor(metadata$Temp)
+metadata$SolRad3mWm2<-factor(metadata$SolRad3mWm2)
+metadata$RelHum2mperc<-factor(metadata$RelHum2mperc)
+
+
+#metadata<-metadata%>%mutate(MySpecificBins = cut(Temp, breaks = c(-Inf,0,33,34,35,36,37,38,39,42,44,45,50,Inf)))
+#head(metadata,10)
+
+#metadata%>%group_by(MySpecificBins)%>%count()
+
+taxonomy<-read_qza("/Users/cherst/Desktop/Thesis Data/-taxonomy-without-spaces.qza")
+taxtable<-taxonomy$data %>% as_tibble() %>%
+  separate(Taxon, sep=";", c("Domain", "Phylum",
+                             "Class", "Order",
+                             "Family", "Genus",
+                             "Species")) #convert the table into a tabular split version-- NA is fine because I didn't do species
+
+# tree for phylogenetic info
+tree<-read_qza("/Users/cherst/Desktop/Thesis Data/filtered-rooted-tree.qza")
+
+
+# check out the ASVs and you'll see what I mean
+SVs[["data"]]  # notice it has 315 columns.. it should only have 115... something is weird too.
+## Create the phyloseq object
+
+
+phy_objCom<-phyloseq(
+  otu_table(SVs$data, taxa_are_rows = T),
+  phy_tree(tree$data),
+  tax_table(as.data.frame(taxtable) %>%
+              select(-Confidence) %>%
+              column_to_rownames("Feature.ID") %>%
+              as.matrix()), #moving the taxonomy to the way phyloseq wants it
+  sample_data(metadata %>% as.data.frame() %>% column_to_rownames("SampleID")))
+
+
+
+## look at it after
+View(phy_objCom)
+phy_objCom@otu_table
+
+##END EDIT
+# taxa table
+taxonomy<-read_qza("/Users/cherst/Desktop/Thesis Data/-taxonomy-without-spaces.qza")
+taxtable<-taxonomy$data %>% as_tibble() %>%
+  separate(Taxon, sep=";", c("Domain", "Phylum",
+                             "Class", "Order",
+                             "Family", "Genus",
+                             "Species")) #convert the table into a tabular split version-- NA is fine because I didn't do species
+
+# tree for phylogenetic info
+tree<-read_qza("/Users/cherst/Desktop/Thesis Data/filtered-rooted-tree.qza")
+
+#making metadata column named SampleID (previously SampleID+lots of others)
+#colnames(metadata)[1]-"SampleID"
+
+#metadata <- metadata %>% 
+       #rename("SampleID" = "c1", "Well" = "c2" , "Description" = "c3", #"BarcodeSequence" = "c4" , "LinkerPrimerSequence" = "c5" , "BarcodePlate" = "c6")
+##making new columns
+#metadata$SampleID <- metadata$Well-2
+
+#metadata2 <- metadata %>%
+  #add_column(Well = "constant_value")
+#metadata2
+
+
+# load dplyr and tidyr library
+#library(dplyr)
+#library(tidyr)
+
+# Split name column into firstname and last name
+#metadata <- metadata %>% separate(`SampleID SampleDate	BarcodeSequence	#LinkerPrimerSequence	BarcodePlate	Well`, c('SampleID', 'BarcodeSequence', #'LinkerPrimerSequence', 'BarcodePlate', 'Well', 'Description', 'SampleDate' ))
+
+#print(" Data frame after splitting: ")
+#df
+
+
+
+# load dplyr and tidyr library
+#library(dplyr)
+#library(tidyr)
+
+# Split name column into firstname and last name
+#df <- df %>% separate(Name, c('First Name', 'Last Name'))
+
+#print(" Data frame after splitting: ")
+#df
+
+## Create the phyloseq object
+
+##phy_objCom<-phyloseq(
+##  otu_table(SVs$data, taxa_are_rows = T), 
+##  phy_tree(tree$data), 
+##  tax_table(as.data.frame(taxtable) %>%
+  #            select(-Confidence) %>%
+   #           column_to_rownames("Feature.ID") %>%
+      #        as.matrix()), #moving the taxonomy to the way phyloseq wants it
+#  sample_data(metadata %>% as.data.frame() %>% #column_to_rownames("SampleID")))
+
+## not all taxa will be Identified.. I make it the last known level so if genus is missing I state that it is in "Family_"
+
+tax.clean <- data.frame(tax_table(phy_objCom))
+for (i in 1:7){ tax.clean[,i] <- as.character(tax.clean[,i])}
+tax.clean[is.na(tax.clean)] <- ""
+
+for (i in 1:nrow(tax.clean)){
+  if (tax.clean[i,2] == ""){
+    kingdom <- paste("Kingdom_", tax.clean[i,1], sep = "")
+    tax.clean[i, 2:7] <- kingdom
+  } else if (tax.clean[i,3] == ""){
+    phylum <- paste("Phylum_", tax.clean[i,2], sep = "")
+    tax.clean[i, 3:7] <- phylum
+  } else if (tax.clean[i,4] == ""){
+    class <- paste("Class_", tax.clean[i,3], sep = "")
+    tax.clean[i, 4:7] <- class
+  } else if (tax.clean[i,5] == ""){
+    order <- paste("Order_", tax.clean[i,4], sep = "")
+    tax.clean[i, 5:7] <- order
+  } else if (tax.clean[i,6] == ""){
+    family <- paste("Family_", tax.clean[i,5], sep = "")
+    tax.clean[i, 6:7] <- family
+  } else if (tax.clean[i,7] == ""){
+    tax.clean$Species[i] <- paste("Genus",tax.clean$Genus[i], sep = "_")
+  }
+}
+
+## import new taxonomy table
+tax_table(phy_objCom) <- as.matrix(tax.clean)
+
+
+## save phyloseq object; this means you won't have to run through all of this over and over again
+
+saveRDS(phy_objCom, "Muscle_phy.rds")
+
+# you and reimport with this:
+## 
+ Muscle_phy<-readRDS("Muscle_phy.rds")
+
+## you can also save all of the data in your global environment which can be nice when you are trying to get help from other people!
+
+save.image(file = "CHTHesis.RData")
+
+## load it back
+load("CHThesis.RData")
+
+```
+
+
+
+## Let's convert to vegan object
+```{r}
+#Phyloseq to Vegan:
+## Phyloseq to Vegan:
+veg_obj<-list(data_loaded=data.frame(otu_table(phy_objCom)),
+map_loaded=data.frame(sample_data(phy_objCom)),
+taxonomy_loaded=data.frame(tax_table(phy_objCom)))
+
+```
+
+
+
+## Can also convert vegan object back to phyloseq:
+>**_Note:_** Most phyloseq functions integrate vegan functionalities so most things that you would want to do in vegan can be done in phyloseq
+
+```{r}
+## Vegan to phyloseq
+# taxonomy
+tax_mat<-as.matrix(veg_obj$taxonomy_loaded)
+colnames(tax_mat) <- c("Domain", "Phylum", "Class",
+                       "Order", "Family", "Genus", "Species")
+TAX <- tax_table(tax_mat)
+
+# otu table
+otu_tab<-as.matrix(veg_obj$data_loaded)
+OTU<-otu_table(otu_tab,taxa_are_rows = T)
+
+# sample data
+SAM_META<-sample_data(as.data.frame(veg_obj$map_loaded))
+
+# make phyloseq
+phy_obj<-phyloseq(OTU,TAX,SAM_META, phy_tree(phy_objCom))
+
+
+```
+
+
+
+## Grabbing alpha diversity and some summary stats
+```{r}
+##### population level diversity ####
+
+##  pull metadata from physeq object
+sam.meta <- meta(phy_objCom)
+
+## Add the rownames as a new colum for easy integration later.
+sam.meta$SampleID <- rownames(sam.meta)
+
+#### Non-phylogenetic diversities: Shannon ####
+## calculated with microbiome package
+## 
+div_shan<- microbiome::alpha(phy_objCom, index="shannon")
+## can run index= "all" if you desire all alpha indices
+
+## Add the rownames to diversity table
+div_shan$SampleID <- rownames(div_shan)
+
+
+#### Phylogenetic diversity: Faith's PD #####
+#Phylogenetic diversity is calculated using the picante package.
+
+## pull ASV table
+phyb.rar.asvtab <- as.data.frame(phy_objCom@otu_table)
+
+
+## We first need to check if the tree is rooted or not 
+
+phy_tree(phy_objCom)
+###rooted so we are good to go
+
+## pull tree
+phyb.rar.tree <- phy_objCom@phy_tree
+
+## Getting the data ready
+div_pd <- pd(t(phyb.rar.asvtab), phyb.rar.tree,include.root=T) 
+# t(ou_table) transposes the table for use in picante and the
+#tree file comes from the first code  we used to read tree
+#file (see making a phyloseq object section)
+
+## Add the rownames to diversity table
+div_pd$SampleID <- rownames(div_pd)
+
+## STEP 4p. merge all of the alphas into one file
+merged_table<-merge(div_pd,div_shan, by = "SampleID", all=T)
+alpha_table<-merge(merged_table,sam.meta, by = "SampleID", all=T)
+
+ 
+write_csv(alpha_table, "alpha.csv")
+
+#### summarize ###
+summarySE(alpha_table, measurevar = "diversity_shannon", groupvars =c("MySpecificBins"))
+summarySE(alpha_table, measurevar = "PD", groupvars =c("MySpecificBins"))
+
+
+```
+
+
+## Common visualizations
+**Barchart for relative abundance**
+```{r}
+##### Relative Abundance for whole community ####
+## relative abundance
+pseq.rel <- microbiome::transform(phy_objCom, "compositional")
+
+## genus 
+
+## merge to Genus rank
+genus<- tax_glom(pseq.rel, taxrank = "Genus")
+ntaxa(genus)
+#
+## melt
+genus_melt<- psmelt(genus)
+
+## get summary statistics genus SampleDates
+g_abund<-summarySE(genus_melt, measurevar = "Abundance", groupvars =c("Genus", "SampleDate"))
+
+##remove 0 abundance
+g_abund$Abundance[g_abund$Abundance==0] <- NA
+g_abund<-g_abund[complete.cases(g_abund$Abundance),]
+g_abund<- g_abund %>% 
+  mutate_if(is.numeric, round, digits = 5)
+# unique(g_abund$Genus)
+
+
+
+## genus
+g_abund$Genus <- as.character(g_abund$Genus)
+
+#simple way to rename phyla with < 1% abundance
+g_abund$Genus[g_abund$Abundance <= 0.01] <- "Minor"
+unique(g_abund$Genus)
+
+### put in order you want 
+g_abund$SampleDate <- factor(g_abund$SampleDate)
+                             ##, levels = c("SampleDate0", "SampleDate1", ##"SampleDate2","SampleDate3","SampleDate4", "SampleDate5"))
+```
+
+```{r eval=F}
+
+
+spatial_plot2 <- 
+  ggplot(data=g_abund, aes(x=SampleDate, y=Abundance, fill=Genus, width=.5))
+p2<-spatial_plot2 + geom_bar(aes(),stat="identity", position="stack", width =.9) +
+  scale_fill_manual(values = palette <- rep(c("black","lightpink","turquoise4","cyan2","steelblue4","lightblue","lightslateblue","blue1","cadetblue3","gold1","khaki1","yellow4","lightgoldenrod1","limegreen", "olivedrab2", "springgreen4","lightgreen","palegreen4", "darkseagreen2","green","forestgreen","darkgreen","black","lightpink","turquoise4","cyan2","steelblue4","lightblue","lightslateblue","blue1","cadetblue3","gold1","khaki1","yellow4","lightgoldenrod1","limegreen", "olivedrab2", "springgreen4","lightgreen","palegreen4", "darkseagreen2","green","forestgreen","darkgreen","black","lightpink","turquoise4","cyan2","steelblue4","lightblue","lightslateblue","blue1","cadetblue3","gold1","khaki1","yellow4","lightgoldenrod1","limegreen", "olivedrab2", "springgreen4","lightgreen","palegreen4", "darkseagreen2","green","forestgreen","darkgreen")
+                                            
+                   
+  theme_bw()+
+  theme(legend.position="right",axis.title=element_text(size=9, family="Arial")+
+        legend.key.size=unit(0.2, "cm")+
+        legend.text(element_text(size=5, family="Arial"))+
+        legend.key.width=unit(0.2,'cm') + legend.spacing.x=unit(.2,'cm')+legend.title.align=0 +
+        legend.title =element_text(size=12, family="Arial")+
+        
+   legend.spacing.y= unit(.2, 'cm') 
+  
+   
+       axis.text = element_text(color="black", family="Arial")
+      axis.ticks.x =element_blank()
+       panel.grid.major = element_blank()+
+         guides(fill=guide_legend(title = waiver(), title.position = NULL,title.theme = NULL,title.hjust = NULL,title.vjust = NULL,label = TRUE,label.position = NULL,label.theme = NULL,label.hjust = NULL,label.vjust = NULL,keywidth = NULL,keyheight = NULL,direction = NULL,default.unit = "line",override.aes = list(),nrow = NULL,ncol = NULL, byrow = FALSE, reverse = FALSE, order = 0, ...) + xlab("Xlab")+ ylab("Ylab")
+               
+     # xlab("Xlab")+ ylab("Ylab")
+       
+       #+ panel.grid.minor = element_blank() 
+      # guides(fill=guide_legend( title = waiver() title.position = NULL,title.theme = NULL,title.hjust = NULL,title.vjust = NULL,label = TRUE,label.position = NULL,label.theme = NULL,label.hjust = NULL,label.vjust = NULL,keywidth = NULL,keyheight = NULL,direction = NULL,default.unit = "line",override.aes = list(),nrow = NULL,ncol = NULL, byrow = FALSE, reverse = FALSE, order = 0, ...)
+ ## xlab("Xlab")+ ylab("Ylab")
+  
+   p2
+ ## xlab("Xlab")+ ylab("Ylab")
+##p2
+   
+## plot together & save
+##ggsave("filename"p2.png, plot = p2, device = NULL, scale = 1, width = 5, height = 8, ##units = c("in"), dpi = 300)                                
+
+
+
+
+theme_nice_box <- function(base_family="Courier", ...){
+  theme_bw(base_family = base_family, ...) +
+    theme(
+      panel.grid = element_blank(),
+      strip.background=element_rect(fill="white"),
+      strip.text.x=element_text(size=12),
+      plot.title = element_text(size = 11, hjust=.5),
+      axis.ticks.length = unit(-0.01, "in"),
+      axis.title.x = element_blank(),
+      axis.title.y = element_text(size=12, color="black"),
+      axis.text.y = element_text(size=11, color="black",margin=unit(c(0.2,0.2,0.2,0.2), "cm")), 
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      aspect.ratio = 1,
+      legend.position="none")}
+
+
+p1<-ggplot(data = alpha_table, aes(x = SampleDate, y = PD, fill=SampleDate)) +
+  stat_boxplot(geom ='errorbar', width = 0.6) +
+  geom_boxplot(width = 0.6, color="black")+
+  scale_fill_manual(values= palette <- rep(c("grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35")
+  
+
+#  theme_nice_box()+scale_x_discrete(
+#  name = waiver(),
+#  breaks = waiver(),
+#  minor_breaks = waiver(),
+#  n.breaks = NULL,
+#  labels = waiver(),
+#  limits = NULL,
+#  expand = waiver(),
+  #oob = censor, 
+ # na.value = NA_real_,
+  #trans = "identity",
+  #guide = waiver(),
+#  position = "bottom",
+#  sec.axis = waiver())+
+    ##labels=c("SampleDate0"="SampleDate 0", "SampleDate1"="SampleDate ##1", "SampleDate2"="SampleDate 2", "SampleDate3"="SampleDate 3", ##"SampleDate4"="SampleDate 4", "SampleDate5"="SampleDate 5"))
+
+    #oob = censor,
+    #scale_y_continuous(breaks = scales::pretty_breaks(n = 10), limits = c(0,45))+
+    
+  ylab("Faith's PD")+
+  annotate(geom ="text", x=.59, y=45, label="B")
+p1
+
+p2<-ggplot(data = alpha_table, aes(x = SampleDate, y = diversity_shannon, fill=SampleDate)) +
+  stat_boxplot(geom ='errorbar', width = 0.6) +
+  geom_boxplot(width = 0.6, color="black")+
+  scale_fill_manual(values=c("grey20","gray95", "gray80","gray65" ,"gray50", "gray35","gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35","grey20","gray95", "gray80","gray65" ,"gray50", "gray35"))+
+  theme_nice_box()+
+  ylab("Shannon Diversity")+
+  ggtitle("Cold Treatment")+
+  annotate(geom ="text", x=.59, y=4.0, label="A")
+
+library(cowplot)
+
+(fig1ab<-plot_grid(p2, NULL,
+          p1,
+          nrow = 3,greedy=T,
+          rel_widths=c(1,0,1),rel_heights = c(1,-.1,1), align="hv"))
+
+#scale_y_discrete(diversity_shannon, expand = waiver(), guide = waiver(), position = "left")+
+```
+
+
+## Some random/basic beta diversity plots
+
+```{r eval=F}
+## weighted Sex and Individual
+wunifrac_dist = phyloseq::distance(phy_objCom, method="wunifrac")
+
+wordination = ordinate(phy_objCom, method="PCoA", distance=wunifrac_dist)
+p0<-phyloseq::plot_ordination(phy_objCom, wordination, color="NULL", shape="NULL", axes=c(1,2))+
+  geom_point(size=3.5, color="black")+
+  geom_point(size=3)+
+  annotate(geom="text", x= -0.10, y= 0.05, label="A weighted")+
+  theme(legend.title=element_text(family="Helvetica", size=9),
+        legend.text=element_text(family="Helvetica", size=8),
+        legend.position="bottom",
+        legend.key = element_blank(),
+        panel.background=element_rect(color="black", fill="white"),
+        panel.grid=element_blank(),
+        axis.title.y=element_text(size=12, family="Helvetica"),
+        axis.title.x=element_text(size=12, family="Helvetica"),
+        axis.text.y=element_text(size=10, family="Helvetica", color="black"),
+        axis.text.x=element_text(size=10, family="Helvetica", color="black"))+
+  #scale_shape_manual(name = "Individual & Sex",
+                     # labels = c("A-Female", "B-Female",
+                               #  "C-Female", "D-Female",
+                               #  "E-Female","F-Male",
+                              #   "G-Male","H-Male",
+                               #  "I-Male","J-Male"),
+                     # values = c(19,19,19,19,19,17,17,17,17,17))+
+  #scale_colour_manual(name = "Individual & Sex",
+                    #  labels = c("A-Female", "B-Female",
+                            #     "C-Female", "D-Female",
+                            #     "E-Female","F-Male",
+                            #     "G-Male","H-Male",
+                            #     "I-Male","J-Male"),
+                    #  values = c("black","gray35",
+                               #  "gray55","gray75",
+                               #  "gray95",
+                               #  "black","gray35",
+                               #  "gray55","gray75",
+                               #  "gray95"))+
+  guides(colour = guide_legend(title.position="top", title.hjust = 0.5))
+
+
+
+p1<-phyloseq::plot_ordination(phy_objCom, wordination, color="NULL", shape="NULL", axes=c(1,2))+
+  geom_point(size=3.5, color="black")+
+  geom_point(size=3)+
+  annotate(geom="text", x= -0.07, y= 0.05, label="A weighted", size=3)+
+  theme(legend.title=element_text(family="Helvetica"),
+        legend.position = "none",
+        legend.text=element_text(family="Helvetica"),
+        legend.key = element_blank(),
+        panel.background=element_rect(color="black", fill="white"),
+        panel.grid=element_blank(),
+        axis.title.y=element_text(size=8, family="Helvetica"),
+        axis.title.x=element_text(size=8, family="Helvetica"),
+        axis.text.y=element_text(size=8, family="Helvetica", color="black"),
+        axis.text.x=element_text(size=8, family="Helvetica", color="black"))
+ # scale_shape_manual(name = "Individual & Sex",
+                   #  labels = c("A-Female", "B-Female",
+                    #            "C-Female", "D-Female",
+                    #            "E-Female","F-Male",
+                    #            "G-Male","H-Male",
+                    #            "I-Male","J-Male"),
+                    # values = c(19,19,19,19,19,17,17,17,17,17))+
+  #scale_colour_manual(name = "Individual & Sex",
+                  #    labels = c("A-Female", "B-Female",
+                      #           "C-Female", "D-Female",
+                      #           "E-Female","F-Male",
+                      #           "G-Male","H-Male",
+                      #           "I-Male","J-Male"),
+                     # values = c("black","gray35",
+                      #           "gray55","gray75",
+                       #          "gray95",
+                       #          "black","gray35",
+                      #           "gray55","gray75",
+                      #           "gray95"))
+
+
+leg<-get_legend(p0)
+
+
+### same thing for sex and SampleDate unweighted
+uunifrac_dist = phyloseq::distance(phy_objCom, method="uunifrac")
+uordination = ordinate(phy_objCom, method="PCoA", distance=uunifrac_dist)
+
+
+
+p2<-phyloseq::plot_ordination(phy_objCom, uordination, color="Individual", shape="Individual", axes=c(1,2))+
+  geom_point(size=3.5, color="black")+
+  geom_point(size=3)+
+  annotate(geom="text", x= -0.25, y= 0.2, label="B unweighted", size=3)+
+  theme(legend.title=element_text(family="Helvetica"),
+        legend.position="none",
+        legend.text=element_text(family="Helvetica"),
+        legend.key = element_blank(),
+        panel.background=element_rect(color="black", fill="white"),
+        panel.grid=element_blank(),
+        axis.title.y=element_text(size=8, family="Helvetica"),
+        axis.title.x=element_text(size=8, family="Helvetica"),
+        axis.text.y=element_text(size=8, family="Helvetica", color="black"),
+        axis.text.x=element_text(size=8, family="Helvetica", color="black"))+
+  scale_shape_manual(name = "Individual & Sex",
+                     labels = c("A-Female", "B-Female",
+                                "C-Female", "D-Female",
+                                "E-Female","F-Male",
+                                "G-Male","H-Male",
+                                "I-Male","J-Male"),
+                     values = c(19,19,19,19,19,17,17,17,17,17))+
+  scale_colour_manual(name = "Individual & Sex",
+                      labels = c("A-Female", "B-Female",
+                                 "C-Female", "D-Female",
+                                 "E-Female","F-Male",
+                                 "G-Male","H-Male",
+                                 "I-Male","J-Male"),
+                      values = c("black","gray35",
+                                 "gray55","gray75",
+                                 "gray95",
+                                 "black","gray35",
+                                 "gray55","gray75",
+                                 "gray95"))
+
+
+
+
+(fig3ab<-plot_grid(p1, NULL,
+          p2,
+          nrow = 1,rel_widths=c(1,0,1),
+          rel_heights = c(1,0,1)))
+
+
+
+
+```
+
